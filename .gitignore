@@ -1,0 +1,101 @@
+# ==========================================
+# GitIgnore pro projekt Pontish
+# ==========================================
+
+# --- Výstupy sestavení (Build outputs / Binaries) ---
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.obj
+*.lib
+*.exp
+*.ilk
+*.msi
+*.msix
+
+# C# / .NET složky sestavení
+[Bb]in/
+[Oo]bj/
+[Pp]ackages/
+[Tt]est[Rr]esults/
+
+# Dočasné archivy a balíčky
+*.zip
+*.tar
+*.gz
+*.7z
+*.tmp
+*.temp
+
+# --- Editor & IDE ---
+# Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+# Visual Studio Code (ignorovat dočasná data, zachovat sdílené konfigurace a workspace)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-workspace
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.iml
+
+# Lokální AI agenti / dočasné mezipaměti
+.agents/
+
+# --- Citlivé soubory a klíče (Kritické pro SSH nástroj) ---
+# Privátní SSH klíče a certifikáty
+*.pem
+*.key
+*.pkcs12
+*.pfx
+*.p12
+*.ppk
+id_rsa
+id_rsa*
+id_ed25519
+id_ed25519*
+id_ecdsa
+id_ecdsa*
+id_dsa
+id_dsa*
+known_hosts
+known_hosts.*
+
+# Konfigurační soubory s hesly a lokální nastavení
+*.local
+*.local.json
+*.local.ps1
+.env
+.env.*
+!.env.example
+secrets.*
+passwords.*
+
+# --- Logy a diagnostika ---
+*.log
+*.log.*
+logs/
+
+# --- Operační systém (Windows / macOS) ---
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
