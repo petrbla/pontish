@@ -295,6 +295,12 @@ namespace PontishInstaller
                 Directory.CreateDirectory(installDir);
             }
 
+            string legacyPs1 = Path.Combine(installDir, "pontish.ps1");
+            if (File.Exists(legacyPs1))
+            {
+                try { File.Delete(legacyPs1); } catch { }
+            }
+
             string tempZip = Path.Combine(Path.GetTempPath(), "PontishPayload_" + Guid.NewGuid().ToString("N") + ".zip");
             try
             {

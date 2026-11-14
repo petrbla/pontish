@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pontish</title>
+  <link rel="stylesheet" href="vendor/xterm.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- TOP HEADER -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="shield-orb" id="shieldOrb">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/>
+            <rect x="9" y="10" width="6" height="5" rx="1"/>
+            <path d="M10 10V8a2 2 0 114 0v2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">Pontish <span class="version-pill" id="appVersion">v0.0.1</span></div>
+          <div class="brand-sub" id="headerSummary">...</div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="bridge-global-btns" id="bridgeGlobalBtns">
+          <button class="btn btn-emerald" id="btnStartAll">▶ <span data-i18n="BtnStartAll">Zapnout vše</span></button>
+          <button class="btn btn-coral" id="btnStopAll">■ <span data-i18n="BtnStopAll">Vypnout vše</span></button>
+        </div>
+        <button class="btn btn-ghost" id="btnReload">↻ <span data-i18n="BtnReload">Načíst config</span></button>
+        <button class="theme-btn" id="btnTheme" title="Světlý / Tmavý režim">☀️</button>
+        <div class="lang-switch" id="langSwitch"></div>
+      </div>
+    </header>
+
+    <!-- MAIN NAV TABS -->
+    <nav class="main-nav">
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="bridges" id="tabBridges">
+          <span class="tab-dot"></span>
+          <span id="lblTabBridges">Mosty (0)</span>
+        </button>
+        <button class="nav-tab" data-tab="terminals" id="tabTerminals">
+          <span class="tab-icon">&gt;_</span>
+          <span id="lblTabTerminals">Terminály (0)</span>
+        </button>
+      </div>
+      <div class="nav-quick-links">
+        <button class="link-btn" id="btnForgetPass" data-i18n="LnkForgetPass">Zapomenout hesla</button>
+        <button class="link-btn" id="btnExportImport" data-i18n="LnkExportImport">Export / Import</button>
+        <button class="link-btn" id="btnEditConfig" data-i18n="LnkEditConfig">Upravit ~/.ssh/config</button>
+      </div>
+    </nav>
+
+    <!-- VIEW 1: BRIDGES -->
+    <main class="view-bridges active" id="viewBridges">
+      <div class="bridges-grid" id="bridgesGrid"></div>
+    </main>
+
+    <!-- VIEW 2: TERMINALS & SFTP -->
+    <main class="view-terminals" id="viewTerminals">
+      <aside class="sidebar">
+        <div class="sidebar-tabs">
+          <button class="side-tab active" data-sidetab="sessions" id="sideTabSessions" data-i18n="SideTabSessions">Relace</button>
+          <button class="side-tab" data-sidetab="files" id="sideTabFiles" data-i18n="SideTabFiles">SFTP Soubory</button>
+        </div>
+
+        <!-- SUBTAB: SESSIONS -->
+        <div class="side-pane active" id="paneSessions">
+          <div class="side-header">
+            <div class="side-title" data-i18n="SidebarSessions">Relace (Sessions)</div>
+            <div class="side-hint" data-i18n="SidebarHint">Kliknutím otevřete novou záložku</div>
+            <label class="toggle-row">
+              <input type="checkbox" id="chkAdminRoot" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-label amber" data-i18n="AdminRootMode">Admin (root)</span>
+            </label>
+          </div>
+          <div class="sessions-list" id="sessionsList"></div>
+        </div>
+
+        <!-- SUBTAB: SFTP TREE -->
+        <div class="side-pane" id="paneFiles">
+          <div class="tree-toolbar">
+            <div class="tree-btns">
+              <button class="icon-btn" id="btnTreeRefresh" title="Refresh">↻</button>
+              <button class="icon-btn" id="btnTreeHome" title="Home">~</button>
+              <button class="icon-btn" id="btnTreeRoot" title="/">/</button>
+              <label class="toggle-row compact">
+                <input type="checkbox" id="chkTreeAdmin" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label amber" data-i18n="AdminRootMode">Admin (root)</span>
+              </label>
+            </div>
+            <label class="check-inline">
+              <input type="checkbox" id="chkTreeFollowCd" checked />
+              <span data-i18n="TreeFollowCd">Posílat cd do terminálu</span>
+            </label>
+            <div class="tree-status" id="treeStatus">...</div>
+          </div>
+          <div class="tree-container" id="treeContainer"></div>
+        </div>
+      </aside>
+
+      <!-- RIGHT WORKSPACE -->
+      <section class="workspace">
+        <div class="term-tabbar" id="termTabbar"></div>
+        <div class="workspace-body" id="workspaceBody">
+          <div class="empty-workspace" id="emptyWorkspace">
+            <div class="empty-orb">&gt;_</div>
+            <div class="empty-text" data-i18n="TermNone">Vyberte server v levém panelu Relace pro otevření terminálu.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- FOOTER / COLLAPSIBLE LOG -->
+    <footer class="footer-bar">
+      <div class="footer-controls">
+        <label class="check-inline">
+          <input type="checkbox" id="chkAutoReconnect" checked />
+          <span data-i18n="ChkAutoReconnect">Auto-obnovení při výpadku</span>
+        </label>
+        <div class="footer-right">
+          <button class="link-btn" id="btnToggleLog">Log <span id="logArrow">▲</span></button>
+          <button class="link-btn danger" id="btnQuit" data-i18n="LnkQuit">Úplně ukončit aplikaci</button>
+        </div>
+      </div>
+      <div class="log-drawer" id="logDrawer">
+        <pre id="logOutput"></pre>
+      </div>
+    </footer>
+  </div>
+
+  <!-- CONTEXT MENU FOR SFTP TREE -->
+  <div class="ctx-menu" id="treeCtxMenu">
+    <button id="ctxCd" data-i18n="TreeMenuCd">Přejít v terminálu (cd)</button>
+    <button id="ctxDownload" data-i18n="TreeMenuDownload">Stáhnout do Windows...</button>
+    <button id="ctxUpload" data-i18n="TreeMenuUpload">Nahrát soubor do složky...</button>
+    <div class="ctx-sep"></div>
+    <button id="ctxRefresh" data-i18n="SftpRefresh">Obnovit</button>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal-card">
+      <div class="modal-title" id="modalTitle"></div>
+      <div class="modal-desc" id="modalDesc"></div>
+      <input type="password" class="modal-input" id="modalInput" />
+      <label class="check-inline" id="modalRememberWrap">
+        <input type="checkbox" id="modalRemember" checked />
+        <span data-i18n="PwdRemember">Zapamatovat heslo po dobu běhu aplikace</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="modalCancel" data-i18n="PwdCancel">Zrušit</button>
+        <button class="btn btn-emerald" id="modalOk" data-i18n="PwdConnect">Připojit</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/xterm.min.js"></script>
+  <script src="vendor/addon-fit.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
