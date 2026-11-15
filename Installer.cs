@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace PontishInstaller
 {
@@ -31,7 +32,7 @@ namespace PontishInstaller
         private Button btnClose;
 
         private string installDir;
-        public const string AppVersion = "0.0.1";
+        public const string AppVersion = "0.1.0";
         private readonly bool isCs = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("cs", StringComparison.OrdinalIgnoreCase);
 
         private string L(string cs, string en)
@@ -379,11 +380,187 @@ namespace PontishInstaller
                 CreateShortcut(Path.Combine(startMenu, "Pontish.lnk"), exeTarget, installDir, icoTarget, L("Pontish - Spravce SSH tunelu k VPS", "Pontish - SSH Tunnel Manager"));
                 Log(L("Vytvoren zastupce v nabidce Start.", "Start Menu shortcut created."));
             }
+
+            string uninstallExe = Path.Combine(installDir, "Uninstall.exe");
+            try
+            {
+                string selfExe = Application.ExecutablePath;
+                if (!string.Equals(selfExe, uninstallExe, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(selfExe, uninstallExe, true);
+                }
+            }
+            catch { }
+
+            RegisterInWindowsUninstall(installDir, exeTarget, icoTarget, uninstallExe);
+            Log(L("Zaregistrovano v Nainstalovanych aplikacich Windows.", "Registered in Windows Installed Apps."));
             SetProgress(95);
+        }
+
+        private void RegisterInWindowsUninstall(string installDir, string exeTarget, string icoTarget, string uninstallExe)
+        {
+            const string regPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Pontish";
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(regPath))
+            {
+                if (key == null) return;
+                key.SetValue("DisplayName", "Pontish", RegistryValueKind.String);
+                key.SetValue("DisplayVersion", AppVersion, RegistryValueKind.String);
+                key.SetValue("Publisher", "Pontish Open Source", RegistryValueKind.String);
+                key.SetValue("DisplayIcon", File.Exists(icoTarget) ? icoTarget : exeTarget, RegistryValueKind.String);
+                key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
+                key.SetValue("UninstallString", "\"" + uninstallExe + "\" /uninstall", RegistryValueKind.String);
+                key.SetValue("QuietUninstallString", "\"" + uninstallExe + "\" /uninstall /quiet", RegistryValueKind.String);
+                key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+                key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"), RegistryValueKind.String);
+                key.SetValue("URLInfoAbout", "https://github.com/petrbla/pontish", RegistryValueKind.String);
+
+                long totalBytes = 0;
+                try
+                {
+                    foreach (string f in Directory.GetFiles(installDir, "*", SearchOption.AllDirectories))
+                    {
+                        try { totalBytes += new FileInfo(f).Length; } catch { }
+                    }
+                }
+                catch { }
+                int sizeKb = (int)Math.Max(1, totalBytes / 1024);
+                key.SetValue("EstimatedSize", sizeKb, RegistryValueKind.DWord);
+            }
+        }
+
+        private static void RunUninstall(bool quiet)
+        {
+            bool isCs = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("cs", StringComparison.OrdinalIgnoreCase);
+            if (!quiet)
+            {
+                DialogResult res = MessageBox.Show(
+                    isCs
+                        ? "Opravdu chcete odinstalovat aplikaci Pontish?\n\nVaše konfigurace a klíče ve složce ~/.ssh/ zůstanou zachovány."
+                        : "Are you sure you want to uninstall Pontish?\n\nYour configuration and keys in ~/.ssh/ will be preserved.",
+                    isCs ? "Odinstalace Pontish" : "Uninstall Pontish",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+                if (res != DialogResult.Yes) return;
+            }
+
+            StopRunningInstancesStatic();
+
+            try
+            {
+                string desktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Pontish.lnk");
+                if (File.Exists(desktopLnk)) File.Delete(desktopLnk);
+            }
+            catch { }
+
+            try
+            {
+                string startLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Pontish.lnk");
+                if (File.Exists(startLnk)) File.Delete(startLnk);
+            }
+            catch { }
+
+            try
+            {
+                Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\Pontish", false);
+            }
+            catch { }
+
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string sshDir = Path.Combine(userProfile, ".ssh");
+            string askPassPath = Path.Combine(sshDir, "askpass.exe");
+            try
+            {
+                if (File.Exists(askPassPath)) File.Delete(askPassPath);
+            }
+            catch { }
+
+            string vaultPath = Path.Combine(sshDir, "pontish.vault");
+            if (!quiet && File.Exists(vaultPath))
+            {
+                DialogResult delVault = MessageBox.Show(
+                    isCs
+                        ? "Chcete při odinstalaci smazat i soubor s uloženými hesly (~/.ssh/pontish.vault)?\n\nSoubor ~/.ssh/config a vaše SSH klíče zůstanou zachovány."
+                        : "Do you also want to delete the saved passwords file (~/.ssh/pontish.vault)?\n\nYour ~/.ssh/config and SSH keys will be preserved.",
+                    isCs ? "Uložená hesla" : "Saved passwords",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+                if (delVault == DialogResult.Yes)
+                {
+                    try { File.Delete(vaultPath); } catch { }
+                }
+            }
+
+            string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Pontish");
+            try
+            {
+                if (Directory.Exists(appDataDir)) Directory.Delete(appDataDir, true);
+            }
+            catch { }
+
+            string installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Pontish");
+            string selfExe = Application.ExecutablePath;
+
+            if (Directory.Exists(installDir))
+            {
+                foreach (string file in Directory.GetFiles(installDir, "*", SearchOption.AllDirectories))
+                {
+                    if (string.Equals(file, selfExe, StringComparison.OrdinalIgnoreCase)) continue;
+                    try { File.Delete(file); } catch { }
+                }
+                foreach (string dir in Directory.GetDirectories(installDir))
+                {
+                    try { Directory.Delete(dir, true); } catch { }
+                }
+
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = string.Format("/c ping 127.0.0.1 -n 3 >nul & rmdir /s /q \"{0}\"", installDir),
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    });
+                }
+                catch { }
+            }
+
+            if (!quiet)
+            {
+                MessageBox.Show(
+                    isCs ? "Aplikace Pontish byla úspěšně odinstalována." : "Pontish has been successfully uninstalled.",
+                    isCs ? "Odinstalace dokončena" : "Uninstall complete",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+            }
         }
 
         private void StopRunningInstances()
         {
+            StopRunningInstancesStatic();
+        }
+
+        private static void StopRunningInstancesStatic()
+        {
+            try
+            {
+                foreach (Process proc in Process.GetProcessesByName("Pontish"))
+                {
+                    try
+                    {
+                        proc.Kill();
+                        proc.WaitForExit(3000);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
@@ -449,10 +626,27 @@ namespace PontishInstaller
         }
 
         [STAThread]
-        public static void Main()
+        public static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            bool uninstall = false;
+            bool quiet = false;
+            if (args != null)
+            {
+                foreach (string a in args)
+                {
+                    if (string.Equals(a, "/uninstall", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--uninstall", StringComparison.OrdinalIgnoreCase))
+                        uninstall = true;
+                    if (string.Equals(a, "/quiet", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/q", StringComparison.OrdinalIgnoreCase))
+                        quiet = true;
+                }
+            }
+            if (uninstall)
+            {
+                RunUninstall(quiet);
+                return;
+            }
             Application.Run(new InstallerForm());
         }
     }

@@ -1,37 +1,78 @@
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="cs" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pontish</title>
   <link rel="stylesheet" href="vendor/xterm.min.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=40" />
 </head>
 <body>
   <div class="app-shell">
+    <!-- WINDOWS-STYLE MENU BAR -->
+    <nav class="win-menubar" id="winMenubar">
+      <div class="win-menu">
+        <button class="win-menu-trigger" type="button" data-i18n="MenuFile">Soubor</button>
+        <div class="win-menu-drop">
+          <button type="button" data-menu-act="reloadConfig"><span data-i18n="MenuReloadSsh">↻ Načíst ~/.ssh/config</span></button>
+          <button type="button" data-menu-act="exportImport"><span data-i18n="MenuExpImp">⇄ Export / Import zálohy…</span></button>
+          <div class="win-menu-sep"></div>
+          <button type="button" class="danger" data-menu-act="quitApp"><span data-i18n="MenuQuitApp">✕ Ukončit aplikaci</span></button>
+        </div>
+      </div>
+      <div class="win-menu">
+        <button class="win-menu-trigger" type="button" data-i18n="MenuView">Zobrazení</button>
+        <div class="win-menu-drop">
+          <button type="button" data-menu-act="tabHome"><span data-i18n="MenuGoHome">⌂ Úvod</span></button>
+          <button type="button" data-menu-act="tabTerminals"><span data-i18n="MenuGoTerminals">&gt;_ Terminály &amp; SFTP</span></button>
+          <button type="button" data-menu-act="tabBridges"><span data-i18n="MenuGoBridges">≍ Mosty (SSH Tunely)</span></button>
+          <div class="win-menu-sep"></div>
+          <button type="button" data-menu-act="toggleTheme"><span data-i18n="MenuToggleTheme">◐ Přepnout světlý / tmavý motiv</span></button>
+          <button type="button" data-menu-act="toggleLog"><span data-i18n="MenuToggleLog">▲ Zobrazit / skrýt Log</span></button>
+        </div>
+      </div>
+      <div class="win-menu">
+        <button class="win-menu-trigger" type="button" data-i18n="MenuTools">Nástroje</button>
+        <div class="win-menu-drop">
+          <button type="button" data-menu-act="visualConfig"><span data-i18n="MenuVisualConfig">⚙ Vizuální editor serverů &amp; tunelů…</span></button>
+          <div class="win-menu-sep"></div>
+          <button type="button" data-menu-act="togglePersistPass"><span id="menuPersistPassMark">☐</span> <span data-i18n="MenuPersistPwd">Ukládat hesla šifrovaně do ~/.ssh</span></button>
+          <button type="button" data-menu-act="forgetPass"><span data-i18n="MenuForgetPwd">🔑 Zapomenout uložená hesla</span></button>
+          <div class="win-menu-sep"></div>
+          <button type="button" data-menu-act="openPs"><span data-i18n="MenuNewPs">&gt;_ Nový PowerShell</span></button>
+          <button type="button" data-menu-act="openCmd"><span data-i18n="MenuNewCmd">&gt;_ Nový CMD</span></button>
+        </div>
+      </div>
+      <div class="win-menu">
+        <button class="win-menu-trigger" type="button" data-i18n="MenuHelp">Nápověda</button>
+        <div class="win-menu-drop">
+          <button type="button" data-menu-act="showHelp"><span data-i18n="MenuQuickHelp">📖 Rychlá nápověda &amp; zkratky</span><kbd>F1</kbd></button>
+          <button type="button" data-menu-act="checkUpdate"><span data-i18n="MenuCheckUpd">↻ Zkontrolovat aktualizace…</span></button>
+          <div class="win-menu-sep"></div>
+          <button type="button" data-menu-act="showAbout"><span data-i18n="MenuAbout">ℹ O aplikaci Pontish (About)</span></button>
+        </div>
+      </div>
+    </nav>
+
     <!-- TOP HEADER -->
     <header class="topbar">
       <div class="brand">
         <div class="shield-orb" id="shieldOrb">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/>
-            <rect x="9" y="10" width="6" height="5" rx="1"/>
-            <path d="M10 10V8a2 2 0 114 0v2"/>
+          <svg viewBox="0 0 256 256" width="26" height="26">
+            <path d="M5.12 37.12 C40.96 21.76 102.4 7.68 128 3.84 C153.6 7.68 215.04 21.76 250.88 37.12 C250.88 128 225.28 213.76 128 252.16 C30.72 213.76 5.12 128 5.12 37.12 Z" fill="#0e74d6"/>
+            <path d="M81.231 72.993 C81.231 45.953 102.79 24.032 129.385 24.032 C155.98 24.032 177.539 45.953 177.539 72.993 L177.539 82.446 L183.086 82.446 C191.451 82.446 198.232 90.874 198.232 101.27 L198.232 183.415 C198.232 193.812 191.451 202.24 183.086 202.24 L75.684 202.24 C67.319 202.24 60.538 193.812 60.538 183.415 L60.538 101.27 C60.538 90.874 67.319 82.446 75.684 82.446 L81.231 82.446 Z M129.385 43.232 C113.394 43.232 100.431 56.557 100.431 72.993 L100.431 82.446 L158.339 82.446 L158.339 72.993 C158.339 56.557 145.376 43.232 129.385 43.232 Z" fill="#ffffff" fill-rule="evenodd"/>
+            <path d="M107.741 132.492 C107.741 121.802 116.811 113.136 128 113.136 C139.189 113.136 148.259 121.802 148.259 132.492 C148.259 139.66 144.181 145.918 138.12 149.263 L138.12 174.802 C138.12 178.683 135.589 181.829 132.466 181.829 L123.515 181.829 C120.392 181.829 117.861 178.683 117.861 174.802 L117.861 149.253 C111.811 145.905 107.741 139.652 107.741 132.492 Z" fill="#0e74d6"/>
           </svg>
         </div>
         <div>
-          <div class="brand-title">Pontish <span class="version-pill" id="appVersion">v0.0.1</span></div>
+          <div class="brand-title">Pontish <span class="version-pill" id="appVersion">v0.1.0</span></div>
           <div class="brand-sub" id="headerSummary">...</div>
         </div>
       </div>
 
       <div class="topbar-actions">
-        <div class="bridge-global-btns" id="bridgeGlobalBtns">
-          <button class="btn btn-emerald" id="btnStartAll">▶ <span data-i18n="BtnStartAll">Zapnout vše</span></button>
-          <button class="btn btn-coral" id="btnStopAll">■ <span data-i18n="BtnStopAll">Vypnout vše</span></button>
-        </div>
         <button class="btn btn-ghost" id="btnReload">↻ <span data-i18n="BtnReload">Načíst config</span></button>
-        <button class="theme-btn" id="btnTheme" title="Světlý / Tmavý režim">☀️</button>
+        <button class="theme-btn" id="btnTheme" title="Světlý / Tmavý režim" aria-label="Motiv"></button>
         <div class="lang-switch" id="langSwitch"></div>
       </div>
     </header>
@@ -39,73 +80,39 @@
     <!-- MAIN NAV TABS -->
     <nav class="main-nav">
       <div class="nav-tabs">
-        <button class="nav-tab active" data-tab="bridges" id="tabBridges">
-          <span class="tab-dot"></span>
-          <span id="lblTabBridges">Mosty (0)</span>
+        <button class="nav-tab active" data-tab="home" id="tabHome">
+          <span class="tab-home-ico">⌂</span>
+          <span id="lblTabHome" data-i18n="TabHome">Úvod</span>
         </button>
         <button class="nav-tab" data-tab="terminals" id="tabTerminals">
           <span class="tab-icon">&gt;_</span>
           <span id="lblTabTerminals">Terminály (0)</span>
         </button>
-      </div>
-      <div class="nav-quick-links">
-        <button class="link-btn" id="btnForgetPass" data-i18n="LnkForgetPass">Zapomenout hesla</button>
-        <button class="link-btn" id="btnExportImport" data-i18n="LnkExportImport">Export / Import</button>
-        <button class="link-btn" id="btnEditConfig" data-i18n="LnkEditConfig">Upravit ~/.ssh/config</button>
+        <button class="nav-tab" data-tab="bridges" id="tabBridges">
+          <svg class="tab-bridge-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16h20"/><path d="M4 16v-3a8 8 0 0 1 16 0v3"/><path d="M6 16v3"/><path d="M18 16v3"/><path d="M9 11v5"/><path d="M15 11v5"/></svg>
+          <span id="lblTabBridges">Mosty (0)</span>
+        </button>
       </div>
     </nav>
 
-    <!-- VIEW 1: BRIDGES -->
-    <main class="view-bridges active" id="viewBridges">
-      <div class="bridges-grid" id="bridgesGrid"></div>
+    <!-- VIEW 0: HOME -->
+    <main class="view-home active" id="viewHome">
+      <div class="home-wrap" id="homeWrap"></div>
     </main>
 
-    <!-- VIEW 2: TERMINALS & SFTP -->
+    <!-- VIEW 1: TERMINALS & SFTP -->
     <main class="view-terminals" id="viewTerminals">
-      <aside class="sidebar">
-        <div class="sidebar-tabs">
-          <button class="side-tab active" data-sidetab="sessions" id="sideTabSessions" data-i18n="SideTabSessions">Relace</button>
-          <button class="side-tab" data-sidetab="files" id="sideTabFiles" data-i18n="SideTabFiles">SFTP Soubory</button>
+      <!-- LEFT SIDEBAR (SESSIONS) -->
+      <aside class="sidebar sidebar-left" id="paneSessions">
+        <div class="side-header">
+          <div class="side-title" data-i18n="SidebarSessions">Relace (Sessions)</div>
+          <div class="side-hint" data-i18n="SidebarHint">Kliknutím otevřete novou záložku</div>
+          <div class="sessions-summary" id="sessionsSummary"></div>
         </div>
-
-        <!-- SUBTAB: SESSIONS -->
-        <div class="side-pane active" id="paneSessions">
-          <div class="side-header">
-            <div class="side-title" data-i18n="SidebarSessions">Relace (Sessions)</div>
-            <div class="side-hint" data-i18n="SidebarHint">Kliknutím otevřete novou záložku</div>
-            <label class="toggle-row">
-              <input type="checkbox" id="chkAdminRoot" />
-              <span class="toggle-slider"></span>
-              <span class="toggle-label amber" data-i18n="AdminRootMode">Admin (root)</span>
-            </label>
-          </div>
-          <div class="sessions-list" id="sessionsList"></div>
-        </div>
-
-        <!-- SUBTAB: SFTP TREE -->
-        <div class="side-pane" id="paneFiles">
-          <div class="tree-toolbar">
-            <div class="tree-btns">
-              <button class="icon-btn" id="btnTreeRefresh" title="Refresh">↻</button>
-              <button class="icon-btn" id="btnTreeHome" title="Home">~</button>
-              <button class="icon-btn" id="btnTreeRoot" title="/">/</button>
-              <label class="toggle-row compact">
-                <input type="checkbox" id="chkTreeAdmin" />
-                <span class="toggle-slider"></span>
-                <span class="toggle-label amber" data-i18n="AdminRootMode">Admin (root)</span>
-              </label>
-            </div>
-            <label class="check-inline">
-              <input type="checkbox" id="chkTreeFollowCd" checked />
-              <span data-i18n="TreeFollowCd">Posílat cd do terminálu</span>
-            </label>
-            <div class="tree-status" id="treeStatus">...</div>
-          </div>
-          <div class="tree-container" id="treeContainer"></div>
-        </div>
+        <div class="sessions-list" id="sessionsList"></div>
       </aside>
 
-      <!-- RIGHT WORKSPACE -->
+      <!-- CENTER WORKSPACE (TERMINALS) -->
       <section class="workspace">
         <div class="term-tabbar" id="termTabbar"></div>
         <div class="workspace-body" id="workspaceBody">
@@ -114,7 +121,36 @@
             <div class="empty-text" data-i18n="TermNone">Vyberte server v levém panelu Relace pro otevření terminálu.</div>
           </div>
         </div>
+        <div class="ssh-sysbar" id="sshSysbar"></div>
       </section>
+
+      <!-- RIGHT SIDEBAR (SFTP TREE) -->
+      <aside class="sidebar sidebar-right" id="paneFiles">
+        <div class="tree-toolbar">
+          <div class="side-title" style="margin-bottom:2px;" data-i18n="SideTabFiles">SFTP Soubory</div>
+          <div class="tree-btns">
+            <button class="icon-btn" id="btnTreeRefresh" title="Refresh">↻</button>
+            <button class="icon-btn" id="btnTreeHome" title="Home">~</button>
+            <button class="icon-btn" id="btnTreeRoot" title="/">/</button>
+            <label class="toggle-row compact">
+              <input type="checkbox" id="chkTreeAdmin" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-label amber" data-i18n="AdminRootMode">Admin (root)</span>
+            </label>
+          </div>
+          <label class="check-inline">
+            <input type="checkbox" id="chkTreeFollowCd" checked />
+            <span data-i18n="TreeFollowCd">Posílat cd do terminálu</span>
+          </label>
+          <div class="tree-status" id="treeStatus">...</div>
+        </div>
+        <div class="tree-container" id="treeContainer"></div>
+      </aside>
+    </main>
+
+    <!-- VIEW 2: BRIDGES -->
+    <main class="view-bridges" id="viewBridges">
+      <div class="bridges-grid" id="bridgesGrid"></div>
     </main>
 
     <!-- FOOTER / COLLAPSIBLE LOG -->
@@ -161,8 +197,42 @@
     </div>
   </div>
 
+  <!-- HELP / ABOUT MODAL -->
+  <div class="modal-backdrop" id="infoModalBackdrop">
+    <div class="modal-card info-modal-card">
+      <div class="modal-title" id="infoModalTitle"></div>
+      <div class="info-modal-body" id="infoModalBody"></div>
+      <div class="modal-actions">
+        <button class="btn btn-blue" id="infoModalClose" data-i18n="BtnClose">Zavřít</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL SSH CONFIG EDITOR MODAL -->
+  <div class="modal-backdrop" id="cfgEditorBackdrop">
+    <div class="modal-card cfg-modal-card">
+      <div class="cfg-modal-hdr">
+        <div class="modal-title" data-i18n="CfgTitle">⚙ Vizuální editor ~/.ssh/config</div>
+        <button class="icon-btn" id="cfgCloseTop" type="button">✕</button>
+      </div>
+      <div class="cfg-modal-body">
+        <div class="cfg-list-col">
+          <div class="cfg-new-btns">
+            <button class="btn btn-sm btn-blue" id="cfgBtnNewSsh" type="button" data-i18n="CfgNewSsh">+ Nový SSH</button>
+            <button class="btn btn-sm btn-emerald" id="cfgBtnNewBridge" type="button" data-i18n="CfgNewBridge">+ Nový most</button>
+          </div>
+          <div class="cfg-host-list" id="cfgHostList"></div>
+        </div>
+        <div class="cfg-form-col" id="cfgFormCol"></div>
+      </div>
+      <div class="cfg-modal-ftr">
+        <button class="btn btn-sm btn-ghost" id="cfgBtnEditNotepad" type="button" data-i18n="BtnEditTextCfg">✎ Upravit v Notepadu</button>
+      </div>
+    </div>
+  </div>
+
   <script src="vendor/xterm.min.js"></script>
   <script src="vendor/addon-fit.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=45"></script>
 </body>
 </html>

@@ -46,5 +46,17 @@ namespace PontishApp
     public class AppSettings
     {
         public string Language { get; set; } = "en";
+        public bool PersistPasswords { get; set; } = false;
+        public int? WindowWidth { get; set; }
+        public int? WindowHeight { get; set; }
+        public int? WindowX { get; set; }
+        public int? WindowY { get; set; }
+        public bool WindowMaximized { get; set; } = false;
+    }
+
+    public class VaultPayload
+    {
+        public Dictionary<string, string> Passwords { get; set; } = new Dictionary<string, string>();
+        public Dictionary<string, string> SudoPasswords { get; set; } = new Dictionary<string, string>();
     }
 }

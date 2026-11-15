@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 
 namespace PontishApp
 {
@@ -75,7 +77,7 @@ namespace PontishApp
             if (!isAutoReconnect) t.ReconnectAttempts = 0;
 
             string askPassExe = _cfg.EnsureAskPassExe();
-            var psi = new ProcessStartInfo("ssh.exe", $"-F \"{_cfg.SshConfigPath}\" -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ConnectTimeout=15 {t.HostAlias}")
+            var psi = new ProcessStartInfo("ssh.exe", $"-F \"{_cfg.SshConfigPath}\" -N -o ExitOnForwardFailure=yes -o NumberOfPasswordPrompts=1 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ConnectTimeout=15 {t.HostAlias}")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -101,8 +103,21 @@ namespace PontishApp
 
                 proc.ErrorDataReceived += (s, e) =>
                 {
-                    if (!string.IsNullOrWhiteSpace(e.Data))
-                        Log($"[{t.HostAlias}] {e.Data.Trim()}");
+                    if (string.IsNullOrWhiteSpace(e.Data)) return;
+                    string line = e.Data.Trim();
+                    Log($"[{t.HostAlias}] {line}");
+
+                    if (line.Contains("Permission denied", StringComparison.OrdinalIgnoreCase) ||
+                        line.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase) ||
+                        line.Contains("Too many authentication failures", StringComparison.OrdinalIgnoreCase))
+                    {
+                        t.UserRequestedRun = false;
+                        t.IsConnecting = false;
+                        t.NextReconnectTime = DateTime.MinValue;
+                        if (_cfg.SavedPasswords.Remove(t.HostAlias))
+                            _cfg.SaveVaultIfEnabled();
+                        Log($"[{t.HostAlias}] Overeni selhalo - auto-reconnect zastaven a ulozene heslo odebrano (ochrana proti fail2ban).");
+                    }
                 };
                 proc.BeginErrorReadLine();
             }
@@ -128,6 +143,73 @@ namespace PontishApp
             }
         }
 
+        public bool IsTunnelListening(SshHostConfig t)
+        {
+            if (t == null || t.Forwards.Count == 0) return false;
+            var ports = GetListeningTcpPorts();
+            return t.Forwards.All(f => ports.Contains(f.LocalPort));
+        }
+
+        [DllImport("iphlpapi.dll", SetLastError = true)]
+        private static extern uint GetExtendedTcpTable(IntPtr pTcpTable, ref int dwOutBufLen, bool sort, int ipVersion, int tblClass, uint reserved = 0);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MIB_TCPROW_OWNER_PID
+        {
+            public uint state;
+            public uint localAddr;
+            public uint localPort;
+            public uint remoteAddr;
+            public uint remotePort;
+            public int owningPid;
+        }
+
+        private static void StopExternalTunnelProcesses(SshHostConfig t)
+        {
+            if (t == null || t.Forwards.Count == 0) return;
+            var targetPorts = new HashSet<int>(t.Forwards.Select(f => f.LocalPort));
+            var pidsToKill = new HashSet<int>();
+
+            int buffSize = 0;
+            GetExtendedTcpTable(IntPtr.Zero, ref buffSize, true, 2, 3);
+            if (buffSize > 0)
+            {
+                IntPtr buff = Marshal.AllocHGlobal(buffSize);
+                try
+                {
+                    if (GetExtendedTcpTable(buff, ref buffSize, true, 2, 3) == 0)
+                    {
+                        int numEntries = Marshal.ReadInt32(buff);
+                        IntPtr rowPtr = IntPtr.Add(buff, 4);
+                        int rowSize = Marshal.SizeOf<MIB_TCPROW_OWNER_PID>();
+                        for (int i = 0; i < numEntries; i++)
+                        {
+                            var row = Marshal.PtrToStructure<MIB_TCPROW_OWNER_PID>(rowPtr);
+                            int port = IPAddress.NetworkToHostOrder((short)(row.localPort & 0xFFFF)) & 0xFFFF;
+                            if (targetPorts.Contains(port) && row.owningPid > 4)
+                                pidsToKill.Add(row.owningPid);
+                            rowPtr = IntPtr.Add(rowPtr, rowSize);
+                        }
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buff);
+                }
+            }
+
+            foreach (int pid in pidsToKill)
+            {
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    if (p.ProcessName.Equals("ssh", StringComparison.OrdinalIgnoreCase))
+                        p.Kill(true);
+                }
+                catch { }
+            }
+        }
+
         public void StopTunnel(SshHostConfig t)
         {
             if (t == null) return;
@@ -136,6 +218,7 @@ namespace PontishApp
             t.WasConnected = false;
             t.NextReconnectTime = DateTime.MinValue;
             StopTunnelProcessOnly(t);
+            StopExternalTunnelProcesses(t);
             Log($"Most '{t.HostAlias}' odpojen.");
         }
 

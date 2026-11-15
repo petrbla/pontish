@@ -1,14 +1,14 @@
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$Version = "0.0.1"
+$Version = "0.1.0"
 $AssemblyVersion = "$Version.0"
 
 $root = $PSScriptRoot
 Write-Host "=== Sestavuji Pontish v$Version (.NET 8 + WebView2) + Instalator ===" -ForegroundColor Cyan
 
 # Ukoncit pripadne bezici procesy, aby neblokovaly zapis do .exe souboru
-Get-Process -Name "Instalovat-Pontish", "Pontish" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name "Pontish-Setup", "Instalovat-Pontish", "Pontish" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 200
 
 # Najdeme csc.exe (.NET Framework 4.x) pro askpass.exe a instalator
@@ -62,10 +62,10 @@ try {
     Write-Host "Balim soubory do PontishPayload.zip..."
     [System.IO.Compression.ZipFile]::CreateFromDirectory($stageDir, $payloadZip)
 
-    # 3. Zkompilovat Instalovat-Pontish.exe z Installer.cs + payload.zip
+    # 3. Zkompilovat Pontish-Setup.exe z Installer.cs + payload.zip
     $installerCs = Join-Path $root "Installer.cs"
-    $installerExe = Join-Path $root "Instalovat-Pontish.exe"
-    Write-Host "Kompiluji Instalovat-Pontish.exe (v$Version)..."
+    $installerExe = Join-Path $root "Pontish-Setup.exe"
+    Write-Host "Kompiluji Pontish-Setup.exe (v$Version)..."
     & $csc /nologo /target:winexe /optimize+ @icoArgs "/out:$installerExe" "$installerCs" "$asmInfoCs" `
         "/resource:$payloadZip,PontishPayload.zip" `
         /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:Microsoft.CSharp.dll

@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -16,6 +18,7 @@ namespace PontishApp
         private SafeFileHandle _outPipeRead;
         private StreamWriter _writer;
         private Thread _readThread;
+        private Thread _waitThread;
         private volatile bool _disposed;
 
         public string Id { get; }
@@ -27,7 +30,7 @@ namespace PontishApp
             Id = id;
         }
 
-        public void Start(string commandLine, string workingDirectory = null, short cols = 100, short rows = 30)
+        public void Start(string commandLine, string workingDirectory = null, short cols = 100, short rows = 30, Dictionary<string, string> extraEnv = null)
         {
             var sa = new SECURITY_ATTRIBUTES { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>() };
 
@@ -70,20 +73,29 @@ namespace PontishApp
 
                     var pInfo = new PROCESS_INFORMATION();
                     string dir = string.IsNullOrEmpty(workingDirectory) ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : workingDirectory;
-                    bool ok = CreateProcessW(
-                        null,
-                        commandLine,
-                        IntPtr.Zero,
-                        IntPtr.Zero,
-                        false,
-                        EXTENDED_STARTUPINFO_PRESENT,
-                        IntPtr.Zero,
-                        dir,
-                        ref siEx,
-                        out pInfo);
+                    IntPtr envPtr = BuildEnvironmentBlock(extraEnv);
+                    uint flags = EXTENDED_STARTUPINFO_PRESENT | (envPtr != IntPtr.Zero ? 0x00000400u : 0u);
+                    try
+                    {
+                        bool ok = CreateProcessW(
+                            null,
+                            commandLine,
+                            IntPtr.Zero,
+                            IntPtr.Zero,
+                            false,
+                            flags,
+                            envPtr,
+                            dir,
+                            ref siEx,
+                            out pInfo);
 
-                    if (!ok)
-                        throw new InvalidOperationException("CreateProcessW failed: " + Marshal.GetLastWin32Error());
+                        if (!ok)
+                            throw new InvalidOperationException("CreateProcessW failed: " + Marshal.GetLastWin32Error());
+                    }
+                    finally
+                    {
+                        if (envPtr != IntPtr.Zero) Marshal.FreeHGlobal(envPtr);
+                    }
 
                     _hProcess = pInfo.hProcess;
                     _hThread = pInfo.hThread;
@@ -107,6 +119,52 @@ namespace PontishApp
 
             _readThread = new Thread(ReadLoop) { IsBackground = true };
             _readThread.Start();
+
+            _waitThread = new Thread(WaitProcessExit) { IsBackground = true };
+            _waitThread.Start();
+        }
+
+        private static IntPtr BuildEnvironmentBlock(Dictionary<string, string> extraEnv)
+        {
+            if (extraEnv == null || extraEnv.Count == 0) return IntPtr.Zero;
+
+            var merged = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (DictionaryEntry de in Environment.GetEnvironmentVariables())
+            {
+                if (de.Key is string k && de.Value is string v)
+                    merged[k] = v;
+            }
+            foreach (var kv in extraEnv)
+            {
+                if (!string.IsNullOrEmpty(kv.Key) && kv.Value != null)
+                    merged[kv.Key] = kv.Value;
+            }
+
+            var sb = new StringBuilder();
+            foreach (var kv in merged)
+            {
+                sb.Append(kv.Key).Append('=').Append(kv.Value).Append('\0');
+            }
+            sb.Append('\0');
+
+            byte[] bytes = Encoding.Unicode.GetBytes(sb.ToString());
+            IntPtr ptr = Marshal.AllocHGlobal(bytes.Length);
+            Marshal.Copy(bytes, 0, ptr, bytes.Length);
+            return ptr;
+        }
+
+        private void WaitProcessExit()
+        {
+            IntPtr hProc = _hProcess;
+            if (hProc == IntPtr.Zero) return;
+            WaitForSingleObject(hProc, INFINITE);
+            Thread.Sleep(120);
+            if (!_disposed)
+            {
+                var hPC = Interlocked.Exchange(ref _hPC, IntPtr.Zero);
+                if (hPC != IntPtr.Zero)
+                    try { ClosePseudoConsole(hPC); } catch { }
+            }
         }
 
         private void ReadLoop()
@@ -166,8 +224,15 @@ namespace PontishApp
 
             try { _writer?.Dispose(); } catch { }
             try { _inPipeWrite?.Dispose(); } catch { }
-            if (_hPC != IntPtr.Zero) { try { ClosePseudoConsole(_hPC); } catch { } _hPC = IntPtr.Zero; }
-            if (_hProcess != IntPtr.Zero) { try { TerminateProcess(_hProcess, 0); CloseHandle(_hProcess); } catch { } _hProcess = IntPtr.Zero; }
+            var hPC = Interlocked.Exchange(ref _hPC, IntPtr.Zero);
+            if (hPC != IntPtr.Zero) { try { ClosePseudoConsole(hPC); } catch { } }
+            if (_hProcess != IntPtr.Zero)
+            {
+                try { TerminateProcess(_hProcess, 0); } catch { }
+                try { _waitThread?.Join(300); } catch { }
+                try { CloseHandle(_hProcess); } catch { }
+                _hProcess = IntPtr.Zero;
+            }
             if (_hThread != IntPtr.Zero) { try { CloseHandle(_hThread); } catch { } _hThread = IntPtr.Zero; }
             try { _outPipeRead?.Dispose(); } catch { }
         }
@@ -175,6 +240,7 @@ namespace PontishApp
         #region Win32 ConPTY P/Invoke
         private const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
         private const int PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = 0x00020016;
+        private const uint INFINITE = 0xFFFFFFFF;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct COORD { public short X; public short Y; }
@@ -248,6 +314,9 @@ namespace PontishApp
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool GetExitCodeProcess(IntPtr hProcess, out int lpExitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
         #endregion
     }
 }

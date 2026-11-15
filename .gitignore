@@ -49,9 +49,6 @@
 .idea/
 *.iml
 
-# Lokální AI agenti / dočasné mezipaměti
-.agents/
-
 # --- Citlivé soubory a klíče (Kritické pro SSH nástroj) ---
 # Privátní SSH klíče a certifikáty
 *.pem

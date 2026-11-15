@@ -2,107 +2,99 @@
 
 *🇬🇧 English documentation | 🇨🇿 [Česká verze (Czech)](README.cs.md)*
 
-**Pontish** is a lightweight, modern, and secure open-source SSH bridge and port-forwarding manager for Windows.
+**Pontish** is a modern, lightweight, and secure open-source **SSH Terminal, SFTP Manager, and SSH Bridge (port-forwarding) tool** for Windows (built with **.NET 8 + WebView2 + ConPTY + xterm.js**).
 
-It lives in your Windows System Tray, offers a sleek dark UI, monitors and automatically reconnects your tunnels, and seamlessly integrates with your existing OpenSSH configuration.
+It runs in your Windows System Tray, provides a dark/light UI, a built-in visual `~/.ssh/config` editor, encrypted password storage and encrypted backups, and monitors/reconnects your tunnels automatically.
+
+---
+
+## 📸 Screenshots
+
+| Home Dashboard | Terminals & SFTP | SSH Bridges |
+| :---: | :---: | :---: |
+| ![Home Dashboard](docs/screenshot-home.jpg) | ![Terminals & SFTP](docs/screenshot-terminal.jpg) | ![SSH Bridges](docs/screenshot-bridges.jpg) |
 
 ---
 
 ## ✨ Features
 
-* **Sleek Dark Interface:** Clean overview of all your remote servers, active bridges, and forwarded local ports.
-* **System Tray Resident:** Color-coded status icon and quick toggle controls directly from the clock tray context menu.
-* **Auto-Reconnect Engine:** Automatically detects connection drops (network change, PC sleep/wake) and brings your tunnels back up.
-* **Silent & Secure Password Handling:** Utilizes the standard OpenSSH `SSH_ASKPASS` mechanism for silent background authentication without annoying terminal popup windows.
-* **Native `~/.ssh/config` Support:** Zero redundant configuration. Pontish directly reads and parses your standard OpenSSH config file.
-* **Backup & Restore:** Easily export and import your configurations and keys in a protected `.zip` bundle, including automatic NTFS permission repairs.
+### 🏠 Home Dashboard
+* Quick overview of configured servers, active terminal sessions, and running SSH bridges.
+* One-click launch for SSH/SFTP sessions, local PowerShell/CMD, or bridge toggles.
+* Automatic startup check for new releases on GitHub Releases (with direct installer download link).
+* If `~/.ssh/config` does not exist yet, a **+ Create ~/.ssh/config** button creates it with sensible `Host *` defaults.
+
+### `>_` Integrated Terminals & SFTP File Manager
+* **Built-in ConPTY Terminal (`xterm.js`):** Full color support, interactive CLI apps (`htop`, `nano`, `vim`), clipboard paste, and local PowerShell / CMD tabs.
+* **3-state connection indicators** on terminal tabs and the sessions list: gray (idle), pulsing orange (connecting / waiting for password), green (authenticated).
+* **SFTP Tree & File Manager:** Browse remote directories, auto-sync current working directory with the terminal, upload/download/mkdir/delete, and optional **Admin (`sudo`) mode**.
+* **Live Server SysStats:** Real-time CPU graph, RAM usage, network throughput, and disk usage for the active SSH session.
+
+### 🌉 SSH Bridges (Port-Forwarding Tunnels)
+* Clean bridge cards grouped by comments in `~/.ssh/config` with live local port listening status.
+* **Auto-Reconnect Engine:** Monitors tunnels and automatically restores them after network drops or PC sleep/wake.
+* **System Tray Resident:** Status tray icon with quick toggle controls directly from the tray menu.
+
+### ⚙ Visual `~/.ssh/config` Editor & Windows Menu Bar
+* Split into **SSH Servers** and **Tunnels / Bridges** — add, edit, delete entries, convert an SSH server into a bridge, or browse for private keys.
+* Native-style **Windows menu bar** (`File`, `View`, `Tools`, `Help`) including **`F1`** Quick Help and *About* dialog.
+* Instant **Dark / Light theme** and **Czech / English** language switching.
+
+### 🔐 Password Security & Encrypted Backups
+* **Silent Authentication (`SSH_ASKPASS`):** Passes credentials securely via `askpass.exe` without console popups.
+* **Optional Local Vault (`~/.ssh/pontish.vault`):** Enable *Tools → Save passwords encrypted in ~/.ssh* to persist passwords encrypted with **Windows DPAPI** (`CurrentUser`) and restricted NTFS permissions. *Forget saved passwords* clears both memory and the vault file.
+* **Portable Encrypted Export / Import (`.pontish`):** Back up `~/.ssh/config`, SSH keys, and saved passwords encrypted with your password using **`AES-256-GCM`** + **`PBKDF2-SHA256` (200,000 iterations)**, with automatic NTFS permission repair on import. (Also supports legacy `.zip` and raw `config` files.)
 
 ---
 
 ## ⚙️ Configuration (`~/.ssh/config`)
 
-Pontish does not require a custom database or proprietary settings. It directly reads your existing OpenSSH client configuration file:
-* **File location:** `C:\Users\<YourUsername>\.ssh\config` (or `~/.ssh/config`).
-* Click the **"Upravit ~/.ssh/config"** button at the bottom of the Pontish window to open it directly in your default text editor.
-
-### How Pontish Parses Configs
-Pontish scans your configuration and displays a card for every `Host` entry that contains at least one `LocalForward` directive:
-
-* `Host <alias>` – The server/bridge name displayed on the UI card.
-* `HostName <IP_or_domain>` – Remote server IP or hostname.
-* `User <username>` – SSH user (e.g. `debian`, `ubuntu`, `root`).
-* `Port <number>` – SSH port (defaults to 22).
-* `IdentityFile <path>` – Path to your private key (e.g. `~/.ssh/id_ed25519`). If omitted, Pontish will prompt for your password upon connection and pass it securely.
-* `LocalForward <localPort> <remoteTarget>` – Port forwarding definition (e.g. `LocalForward 8080 127.0.0.1:80`).
-
-### 💡 Smart UI Comments
-You can use standard comments (`#`) directly in your `config` to enrich the Pontish UI:
-
-1. **Card Groups:** A comment formatted as `# === Group Name ===` creates clean visual section headers in the application.
-2. **Port Labels & Clickable URLs:** Adding `# Description -> URL` right above a `LocalForward` line creates a clickable link on the card for instant browser access.
-
-### 📋 Example `~/.ssh/config`:
+Pontish reads and writes your standard OpenSSH client configuration at `C:\Users\<YourUsername>\.ssh\config`.
+If it does not exist yet, click **+ Create ~/.ssh/config** in the app to initialize it with:
 
 ```ssh-config
-# === Production Servers ===
-
-Host web-prod
-    HostName 198.51.100.25
-    User debian
-    Port 22
-    IdentityFile ~/.ssh/id_ed25519
-    # WordPress Admin -> http://localhost:8080
-    LocalForward 8080 127.0.0.1:80
-    # MariaDB Database
-    LocalForward 3306 127.0.0.1:3306
-
-# === Development & Automation ===
-
-Host n8n-dev
-    HostName 203.0.113.10
-    User ubuntu
-    Port 2222
-    # N8N Automation -> http://localhost:5678
-    LocalForward 5678 127.0.0.1:5678
-    # Redis Cache
-    LocalForward 6379 127.0.0.1:6379
+# Pontish SSH Config
+Host *
+    ServerAliveInterval 30
+    TCPKeepAlive yes
+    StrictHostKeyChecking accept-new
 ```
+
+* `Host` entries with at least one `LocalForward` appear in both **Bridges** and **Terminals**.
+* `Host` entries without `LocalForward` appear as **SSH Servers**.
+* `# === Group Name ===` above a `Host` groups cards visually, and `# Label -> URL` above a `LocalForward` renders a clickable link on the bridge card.
 
 ---
 
 ## 🚀 Requirements
 
-* **Operating System:** Windows 10 / 11 (64-bit)
-* **OpenSSH Client:** Standard Windows feature (Settings -> Optional features -> OpenSSH Client)
-* **.NET Framework:** 4.7.2 or newer (preinstalled with modern Windows)
+* **OS:** Windows 10 / 11 (64-bit)
+* **OpenSSH Client:** Windows built-in feature (*Settings → Optional features → OpenSSH Client*)
+* **WebView2 Runtime:** Built into Windows 11 (auto-installed if needed on Windows 10)
+* **.NET 8:** Bundled self-contained in the release installer; **.NET 8 SDK** is required when building from source.
 
 ---
 
 ## 🛠️ Building from Source
 
-The repository is kept 100% clean and transparent, containing only readable source code and zero precompiled binaries.
-
-To compile the launcher and installer from source, run PowerShell:
+The repository contains pure readable source code with zero precompiled binaries. To build the Release application and `Pontish-Setup.exe` installer, run in PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-The script will automatically:
-1. Compile `Pontish.exe` (launcher) from `Launcher.cs`.
-2. Compile `askpass.exe` (password helper) from `askpass.cs`.
-3. Package the application payload.
-4. Compile the self-extracting GUI installer `Instalovat-Pontish.exe` from `Installer.cs`.
+The script will:
+1. Compile `askpass.exe` from `askpass.cs`.
+2. Publish `PontishApp.csproj` (`.NET 8`, `Release`, `win-x64`, self-contained).
+3. Package the application payload into `PontishPayload.zip`.
+4. Compile the GUI installer `Pontish-Setup.exe` from `Installer.cs`.
 
 ---
 
 ## 📦 Installation
 
-1. Run the generated installer: `Instalovat-Pontish.exe`.
-2. The installer will:
-   * Install Pontish to `%LOCALAPPDATA%\Programs\Pontish`.
-   * Create shortcuts on your Desktop and in the Start Menu.
-   * Verify and fix NTFS security permissions on your `~/.ssh/` directory if needed.
+1. Run `Pontish-Setup.exe` (built locally or downloaded from GitHub Releases).
+2. The installer deploys Pontish to `%LOCALAPPDATA%\Programs\Pontish`, creates Desktop and Start Menu shortcuts, and verifies/repairs `~/.ssh/` NTFS permissions.
 
 ---
 
