@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -420,6 +421,13 @@ namespace PontishApp
 
                     case "checkUpdate":
                         HandleCheckUpdate(root.GetProperty("reqId").GetString());
+                        break;
+
+                    case "installUpdate":
+                        HandleInstallUpdate(
+                            root.GetProperty("reqId").GetString(),
+                            root.TryGetProperty("downloadUrl", out var updUrl) ? updUrl.GetString() : null,
+                            root.TryGetProperty("version", out var updVer) ? updVer.GetString() : null);
                         break;
 
                     case "toggleBridge":
@@ -902,15 +910,25 @@ namespace PontishApp
 
                     if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
                     {
+                        string exeDl = null;
                         foreach (var a in assets.EnumerateArray())
                         {
                             string name = a.TryGetProperty("name", out var an) ? an.GetString() : "";
                             string dl = a.TryGetProperty("browser_download_url", out var adu) ? adu.GetString() : "";
-                            if (!string.IsNullOrEmpty(name) && name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(dl))
+                            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(dl)) continue;
+                            if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                             {
                                 downloadUrl = dl;
                                 break;
                             }
+                            if (exeDl == null && name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                            {
+                                exeDl = dl;
+                            }
+                        }
+                        if (downloadUrl == htmlUrl && !string.IsNullOrEmpty(exeDl))
+                        {
+                            downloadUrl = exeDl;
                         }
                     }
 
@@ -947,6 +965,122 @@ namespace PontishApp
             if (Version.TryParse(a, out var va) && Version.TryParse(b, out var vb))
                 return va.CompareTo(vb);
             return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void HandleInstallUpdate(string reqId, string downloadUrl, string version)
+        {
+            Task.Run(async () =>
+            {
+                string tempFile = null;
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(downloadUrl) || !Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+                        throw new InvalidOperationException("Invalid download URL.");
+
+                    string safeVer = string.Concat((version ?? "latest").Where(c => char.IsLetterOrDigit(c) || c == '.' || c == '-'));
+                    if (string.IsNullOrEmpty(safeVer)) safeVer = "latest";
+                    bool isZip = uri.AbsolutePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+                    tempFile = Path.Combine(Path.GetTempPath(), isZip ? $"Pontish-Update-{safeVer}.zip" : $"Pontish-Setup-{safeVer}.exe");
+
+                    using var req = new HttpRequestMessage(HttpMethod.Get, uri);
+                    req.Headers.UserAgent.ParseAdd($"Pontish/{AppVersion}");
+                    using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+                    resp.EnsureSuccessStatusCode();
+
+                    long? totalBytes = resp.Content.Headers.ContentLength;
+                    using (var src = await resp.Content.ReadAsStreamAsync())
+                    using (var dst = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
+                    {
+                        var buffer = new byte[65536];
+                        long readTotal = 0;
+                        int lastPct = -1;
+                        int n;
+                        while ((n = await src.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        {
+                            await dst.WriteAsync(buffer, 0, n);
+                            readTotal += n;
+                            if (totalBytes.HasValue && totalBytes.Value > 0)
+                            {
+                                int pct = (int)Math.Min(100, (readTotal * 100L) / totalBytes.Value);
+                                if (pct != lastPct && (pct % 5 == 0 || pct == 100))
+                                {
+                                    lastPct = pct;
+                                    PostToWeb(new { type = "updateDownloadProgress", percent = pct });
+                                }
+                            }
+                        }
+                    }
+
+                    if (!File.Exists(tempFile) || new FileInfo(tempFile).Length < 100_000)
+                        throw new InvalidOperationException("Downloaded update file is incomplete or invalid.");
+
+                    if (isZip)
+                    {
+                        string extractDir = Path.Combine(Path.GetTempPath(), $"Pontish-Update-{safeVer}-{Guid.NewGuid():N}");
+                        ZipFile.ExtractToDirectory(tempFile, extractDir, true);
+                        string newExe = Path.Combine(extractDir, "Pontish.exe");
+                        if (!File.Exists(newExe))
+                            throw new InvalidOperationException("Pontish.exe not found inside update archive.");
+
+                        string targetDir = _cfg.AppBaseDir.TrimEnd('\\', '/');
+                        string sshAskpass = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh", "askpass.exe");
+                        string cmdPath = Path.Combine(Path.GetTempPath(), $"Pontish-ApplyUpdate-{Guid.NewGuid():N}.cmd");
+                        int pid = Environment.ProcessId;
+
+                        string script = $@"@echo off
+setlocal
+for /l %%i in (1,1,30) do (
+  tasklist /FI ""PID eq {pid}"" 2>nul | find ""{pid}"" >nul
+  if errorlevel 1 goto :copyfiles
+  ping 127.0.0.1 -n 2 >nul
+)
+:copyfiles
+xcopy ""{extractDir}\*"" ""{targetDir}\"" /E /Y /I /Q >nul
+if exist ""{targetDir}\askpass.exe"" copy /Y ""{targetDir}\askpass.exe"" ""{sshAskpass}"" >nul
+start """" ""{targetDir}\Pontish.exe""
+rmdir /S /Q ""{extractDir}"" >nul 2>&1
+del /F /Q ""{tempFile}"" >nul 2>&1
+del /F /Q ""%~f0"" >nul 2>&1
+";
+                        File.WriteAllText(cmdPath, script, Encoding.Default);
+                        PostToWeb(new { type = "installUpdateResult", reqId, ok = true });
+
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = $"/c \"{cmdPath}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WindowStyle = ProcessWindowStyle.Hidden
+                        });
+                    }
+                    else
+                    {
+                        PostToWeb(new { type = "installUpdateResult", reqId, ok = true });
+
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = tempFile,
+                            Arguments = "/update",
+                            UseShellExecute = true
+                        });
+                    }
+
+                    BeginInvoke((Action)(() =>
+                    {
+                        _allowClose = true;
+                        Close();
+                    }));
+                }
+                catch (Exception ex)
+                {
+                    if (!string.IsNullOrEmpty(tempFile))
+                    {
+                        try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                    }
+                    PostToWeb(new { type = "installUpdateResult", reqId, ok = false, error = ex.Message });
+                }
+            });
         }
 
         private void HandleSshSysStats(JsonElement root)

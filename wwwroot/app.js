@@ -11,6 +11,8 @@ const state = {
   persistPasswords: false,
   appVersion: '0.0.1',
   updateStatus: null,
+  updateInstalling: false,
+  updateProgress: 0,
   autoUpdateChecked: false,
   activeMainTab: 'home',
   activeSideTab: 'sessions',
@@ -1403,6 +1405,13 @@ window.chrome.webview.addEventListener('message', async (ev) => {
       }
       break;
 
+    case 'updateDownloadProgress':
+      if (state.updateInstalling) {
+        state.updateProgress = msg.percent ?? 0;
+        renderHome();
+      }
+      break;
+
     case 'log':
       appendLog(msg.message);
       break;
@@ -1569,6 +1578,37 @@ const pollSysStats = async () => {
 
 setInterval(pollSysStats, 3000);
 
+const performAutoUpdate = async (u) => {
+  if (state.updateInstalling) return;
+  const dlUrl = u?.downloadUrl || u?.releaseUrl;
+  const lower = (dlUrl || '').toLowerCase();
+  if (!dlUrl || (!lower.endsWith('.zip') && !lower.endsWith('.exe'))) {
+    post({ cmd: 'openUrl', url: dlUrl });
+    return;
+  }
+
+  state.updateInstalling = true;
+  state.updateProgress = 0;
+  switchMainTab('home');
+  renderHome();
+
+  const res = await sendReq('installUpdate', {
+    downloadUrl: dlUrl,
+    version: u.latestVersion
+  });
+
+  if (!res?.ok) {
+    state.updateInstalling = false;
+    state.updateProgress = 0;
+    state.updateStatus = { ...(u || {}), ok: false, error: t('HomeUpdInstallErr', res?.error || '?') };
+    renderHome();
+    return;
+  }
+
+  state.updateProgress = 100;
+  renderHome();
+};
+
 const checkForUpdates = async (isAuto = false) => {
   if (!isAuto) {
     state.updateStatus = { checking: true };
@@ -1601,7 +1641,7 @@ const checkForUpdates = async (isAuto = false) => {
       okText: t('UpdModalOk', res.latestVersion)
     });
     if (dlg) {
-      post({ cmd: 'openUrl', url: res.downloadUrl || res.releaseUrl });
+      performAutoUpdate(res);
     }
   }
 };
@@ -1625,7 +1665,12 @@ const renderHome = () => {
   const u = state.updateStatus;
   let updateBadge = `<span class="update-pill">${t('HomeUpdCur', state.appVersion)}</span>`;
   let downloadBtn = '';
-  if (u?.checking) {
+  if (state.updateInstalling) {
+    const label = state.updateProgress >= 100
+      ? t('HomeUpdInstalling')
+      : t('HomeUpdDownloading', state.updateProgress);
+    updateBadge = `<span class="update-pill checking">${label}</span>`;
+  } else if (u?.checking) {
     updateBadge = `<span class="update-pill checking">${t('HomeUpdChecking')}</span>`;
   } else if (u && u.ok === false) {
     updateBadge = `<span class="update-pill err">${t('HomeUpdErr', u.error || '?')}</span>`;
@@ -1660,7 +1705,7 @@ const renderHome = () => {
       </div>
       <div class="home-update-right">
         ${downloadBtn}
-        <button class="btn btn-sm btn-ghost" id="homeBtnCheckUpd" ${u?.checking ? 'disabled' : ''}>${t('HomeUpdBtn')}</button>
+        <button class="btn btn-sm btn-ghost" id="homeBtnCheckUpd" ${u?.checking || state.updateInstalling ? 'disabled' : ''}>${t('HomeUpdBtn')}</button>
       </div>
     </div>
 
@@ -1767,7 +1812,7 @@ const renderHome = () => {
   if (homeCreateCfgBtn) homeCreateCfgBtn.onclick = () => post({ cmd: 'createSshConfig' });
   const dlBtn = document.getElementById('homeBtnDownloadUpd');
   if (dlBtn && u) {
-    dlBtn.onclick = () => post({ cmd: 'openUrl', url: u.downloadUrl || u.releaseUrl });
+    dlBtn.onclick = () => performAutoUpdate(u);
   }
   document.getElementById('homeGoTerminals').onclick = () => switchMainTab('terminals');
   document.getElementById('homeGoBridges').onclick = () => switchMainTab('bridges');

@@ -287,8 +287,30 @@ namespace PontishInstaller
 
         private void PerformInstall()
         {
+            PerformInstallCore(
+                installDir,
+                chkDesktopShortcut.Checked,
+                chkStartMenuShortcut.Checked,
+                chkRepairPermissions.Checked,
+                Log,
+                SetProgress);
+        }
+
+        private static void PerformInstallCore(
+            string installDir,
+            bool desktopShortcut,
+            bool startMenuShortcut,
+            bool repairPermissions,
+            Action<string> log,
+            Action<int> progress)
+        {
+            bool isCs = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("cs", StringComparison.OrdinalIgnoreCase);
+            Func<string, string, string> L = (cs, en) => isCs ? cs : en;
+            Action<string> Log = msg => { if (log != null) log(msg); };
+            Action<int> SetProgress = val => { if (progress != null) progress(val); };
+
             Log(L("Ukoncuji pripadnou bezici instanci Pontish...", "Stopping any running Pontish instances..."));
-            StopRunningInstances();
+            StopRunningInstancesStatic();
             SetProgress(20);
 
             if (!Directory.Exists(installDir))
@@ -357,27 +379,27 @@ namespace PontishInstaller
                 Log(L("Aktualizovan askpass.exe v ~/.ssh/", "Updated askpass.exe in ~/.ssh/"));
             }
 
-            if (chkRepairPermissions.Checked)
+            if (repairPermissions)
             {
                 Log(L("Kontroluji a opravuji NTFS prava na ~/.ssh/...", "Checking and repairing NTFS permissions on ~/.ssh/..."));
-                RepairSshFolderPermissions(sshDir);
+                RepairSshFolderPermissionsStatic(sshDir, Log);
             }
             SetProgress(80);
 
             string exeTarget = Path.Combine(installDir, "Pontish.exe");
             string icoTarget = Path.Combine(installDir, "pontish.ico");
 
-            if (chkDesktopShortcut.Checked)
+            if (desktopShortcut)
             {
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                CreateShortcut(Path.Combine(desktop, "Pontish.lnk"), exeTarget, installDir, icoTarget, L("Pontish - Spravce SSH tunelu k VPS", "Pontish - SSH Tunnel Manager"));
+                CreateShortcutStatic(Path.Combine(desktop, "Pontish.lnk"), exeTarget, installDir, icoTarget, L("Pontish - Spravce SSH tunelu k VPS", "Pontish - SSH Tunnel Manager"));
                 Log(L("Vytvoren zastupce na Plose.", "Desktop shortcut created."));
             }
 
-            if (chkStartMenuShortcut.Checked)
+            if (startMenuShortcut)
             {
                 string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
-                CreateShortcut(Path.Combine(startMenu, "Pontish.lnk"), exeTarget, installDir, icoTarget, L("Pontish - Spravce SSH tunelu k VPS", "Pontish - SSH Tunnel Manager"));
+                CreateShortcutStatic(Path.Combine(startMenu, "Pontish.lnk"), exeTarget, installDir, icoTarget, L("Pontish - Spravce SSH tunelu k VPS", "Pontish - SSH Tunnel Manager"));
                 Log(L("Vytvoren zastupce v nabidce Start.", "Start Menu shortcut created."));
             }
 
@@ -392,12 +414,12 @@ namespace PontishInstaller
             }
             catch { }
 
-            RegisterInWindowsUninstall(installDir, exeTarget, icoTarget, uninstallExe);
+            RegisterInWindowsUninstallStatic(installDir, exeTarget, icoTarget, uninstallExe);
             Log(L("Zaregistrovano v Nainstalovanych aplikacich Windows.", "Registered in Windows Installed Apps."));
             SetProgress(95);
         }
 
-        private void RegisterInWindowsUninstall(string installDir, string exeTarget, string icoTarget, string uninstallExe)
+        private static void RegisterInWindowsUninstallStatic(string installDir, string exeTarget, string icoTarget, string uninstallExe)
         {
             const string regPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Pontish";
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(regPath))
@@ -578,7 +600,7 @@ namespace PontishInstaller
             catch { }
         }
 
-        private void RepairSshFolderPermissions(string sshDir)
+        private static void RepairSshFolderPermissionsStatic(string sshDir, Action<string> log)
         {
             string currentUser = WindowsIdentity.GetCurrent().Name;
             string[] files = Directory.GetFiles(sshDir);
@@ -601,13 +623,13 @@ namespace PontishInstaller
                     {
                         p.WaitForExit(3000);
                     }
-                    Log("  Prava OK: " + Path.GetFileName(file));
+                    if (log != null) log("  Prava OK: " + Path.GetFileName(file));
                 }
                 catch { }
             }
         }
 
-        private void CreateShortcut(string shortcutPath, string targetPath, string workingDir, string iconPath, string description)
+        private static void CreateShortcutStatic(string shortcutPath, string targetPath, string workingDir, string iconPath, string description)
         {
             Type shellType = Type.GetTypeFromProgID("WScript.Shell");
             if (shellType == null) return;
@@ -625,6 +647,36 @@ namespace PontishInstaller
             Marshal.FinalReleaseComObject(shell);
         }
 
+        private static void RunSilentUpdate()
+        {
+            bool isCs = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("cs", StringComparison.OrdinalIgnoreCase);
+            string installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Pontish");
+            try
+            {
+                System.Threading.Thread.Sleep(600);
+                PerformInstallCore(installDir, desktopShortcut: false, startMenuShortcut: true, repairPermissions: false, log: null, progress: null);
+                string exePath = Path.Combine(installDir, "Pontish.exe");
+                if (File.Exists(exePath))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        WorkingDirectory = installDir,
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    (isCs ? "Aktualizace Pontish selhala:\n" : "Pontish update failed:\n") + ex.Message,
+                    "Pontish",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+        }
+
         [STAThread]
         public static void Main(string[] args)
         {
@@ -632,6 +684,7 @@ namespace PontishInstaller
             Application.SetCompatibleTextRenderingDefault(false);
             bool uninstall = false;
             bool quiet = false;
+            bool update = false;
             if (args != null)
             {
                 foreach (string a in args)
@@ -640,11 +693,18 @@ namespace PontishInstaller
                         uninstall = true;
                     if (string.Equals(a, "/quiet", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/q", StringComparison.OrdinalIgnoreCase))
                         quiet = true;
+                    if (string.Equals(a, "/update", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--update", StringComparison.OrdinalIgnoreCase))
+                        update = true;
                 }
             }
             if (uninstall)
             {
                 RunUninstall(quiet);
+                return;
+            }
+            if (update)
+            {
+                RunSilentUpdate();
                 return;
             }
             Application.Run(new InstallerForm());

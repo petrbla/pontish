@@ -98,6 +98,15 @@ The script will:
 
 ---
 
+## 🔐 Code Signing Policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+* **Committers and Reviewers:** [petrbla](https://github.com/petrbla)
+* **Privacy & Network Policy:** This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it (connections are made only to user-configured SSH servers and optionally to GitHub Releases to check for updates).
+
+---
+
 ## 📄 License
 
 This project is open-source software licensed under the [MIT License](LICENSE).

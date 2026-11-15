@@ -62,6 +62,11 @@ try {
     Write-Host "Balim soubory do PontishPayload.zip..."
     [System.IO.Compression.ZipFile]::CreateFromDirectory($stageDir, $payloadZip)
 
+    $portableZip = Join-Path $root "Pontish-win-x64.zip"
+    if (Test-Path $portableZip) { Remove-Item -Path $portableZip -Force }
+    Copy-Item -Path $payloadZip -Destination $portableZip -Force
+    Write-Host "Vytvoren portable archiv: $portableZip" -ForegroundColor Green
+
     # 3. Zkompilovat Pontish-Setup.exe z Installer.cs + payload.zip
     $installerCs = Join-Path $root "Installer.cs"
     $installerExe = Join-Path $root "Pontish-Setup.exe"
