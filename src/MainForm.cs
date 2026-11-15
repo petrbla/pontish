@@ -22,7 +22,7 @@ namespace PontishApp
 {
     public class MainForm : Form
     {
-        private const string AppVersion = "0.1.0";
+        private const string AppVersion = "0.1.1";
         private const string GithubRepo = "petrbla/pontish";
         private static readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
         private static readonly JsonSerializerOptions _jsonOpts = new JsonSerializerOptions

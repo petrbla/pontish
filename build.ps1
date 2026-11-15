@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$Version = "0.1.0"
+$Version = "0.1.1"
 $AssemblyVersion = "$Version.0"
 
 $root = $PSScriptRoot

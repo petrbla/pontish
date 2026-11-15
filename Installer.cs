@@ -32,7 +32,7 @@ namespace PontishInstaller
         private Button btnClose;
 
         private string installDir;
-        public const string AppVersion = "0.1.0";
+        public const string AppVersion = "0.1.1";
         private readonly bool isCs = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("cs", StringComparison.OrdinalIgnoreCase);
 
         private string L(string cs, string en)
