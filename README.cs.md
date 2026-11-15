@@ -94,17 +94,10 @@ Skript provede:
 
 ## 📦 Instalace
 
-1. Spusťte vygenerovaný soubor `Pontish-Setup.exe` (nebo si stáhněte nejnovější z GitHub Releases).
+1. Spusťte vygenerovaný soubor `Pontish-Setup.exe` (nebo si stáhněte nejnovější z GitHub Releases), případně rozbalte portable archiv `Pontish-win-x64.zip`.
 2. Instalátor automaticky nainstaluje aplikaci do `%LOCALAPPDATA%\Programs\Pontish`, vytvoří zástupce na Ploše i v nabídce Start a ověří/opraví práva složky `~/.ssh/`.
 
----
-
-## 🔐 Zásady podepisování kódu (Code Signing Policy)
-
-Bezplatné podepisování kódu zajišťuje [SignPath.io](https://about.signpath.io/), certifikát vydává [SignPath Foundation](https://signpath.org/).
-
-* **Správci a schvalovatelé vydání:** [petrbla](https://github.com/petrbla)
-* **Soukromí a síťová komunikace:** Aplikace neodesílá žádná data na cizí servery, pokud si to uživatel výslovně nevyžádá (komunikuje pouze se servery nastavenými uživatelem v `~/.ssh/config` a při kontrole aktualizací s GitHub Releases).
+> **Upozornění k antiviru a Windows SmartScreen:** Vydané soubory zatím nejsou digitálně podepsané. Windows SmartScreen (*Další informace → Přesto spustit*) nebo přísnější antiviry (např. Avast CyberCapture) proto mohou instalátor `Pontish-Setup.exe` dočasně zablokovat nebo zavřít do sandboxu. Pokud k tomu dojde, antivir na chvíli pozastavte po dobu instalace (případně přidejte výjimku pro `%LOCALAPPDATA%\Programs\Pontish`), nebo použijte portable archiv `Pontish-win-x64.zip`.
 
 ---
 

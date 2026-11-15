@@ -93,17 +93,10 @@ The script will:
 
 ## 📦 Installation
 
-1. Run `Pontish-Setup.exe` (built locally or downloaded from GitHub Releases).
+1. Run `Pontish-Setup.exe` (built locally or downloaded from GitHub Releases), or extract the portable `Pontish-win-x64.zip` archive.
 2. The installer deploys Pontish to `%LOCALAPPDATA%\Programs\Pontish`, creates Desktop and Start Menu shortcuts, and verifies/repairs `~/.ssh/` NTFS permissions.
 
----
-
-## 🔐 Code Signing Policy
-
-Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
-
-* **Committers and Reviewers:** [petrbla](https://github.com/petrbla)
-* **Privacy & Network Policy:** This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it (connections are made only to user-configured SSH servers and optionally to GitHub Releases to check for updates).
+> **Note on Windows SmartScreen & Antivirus:** Because the release binaries are currently unsigned, Windows SmartScreen (*More info → Run anyway*) or strict antivirus shields (such as Avast CyberCapture) may temporarily block or sandbox `Pontish-Setup.exe`. If this happens, temporarily pause your antivirus during installation (or add an exception for `%LOCALAPPDATA%\Programs\Pontish`), or use the portable `Pontish-win-x64.zip` archive instead.
 
 ---
 
